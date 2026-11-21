@@ -38,14 +38,10 @@ cards.forEach((color) => {
 
   card.classList.add("game__card");
   card.dataset.color = color;
-
-  // Permitir arrastrar la caja
   card.draggable = false;
 
   board.appendChild(card);
 });
-
-// DESCUBRIR EL COLOR DE UNA CAJA
 
 // ESTADO DEL JUEGO
 let selectedCard = null;
@@ -54,22 +50,106 @@ let seconds = 0;
 let timerInterval = null;
 let mismatchTimeout = null;
 
+// SELECCIONAR TODAS LAS CAJAS
+const gameCards = document.querySelectorAll(".game__card");
+
+// LOCAL STORAGE
+const STORAGE_KEY = "coupleGame";
+
+// ACTUALIZAR EL TIEMPO EN PANTALLA
+const updateTimer = () => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  timer.textContent =
+    String(minutes).padStart(2, "0") +
+    ":" +
+    String(remainingSeconds).padStart(2, "0");
+};
+
+// GUARDAR PARTIDA EN LOCAL STORAGE
+const saveGame = () => {
+  const gameData = {
+    colors: cards,
+    matchedPairs: matchedPairs,
+    seconds: seconds,
+    matchedCards: [...gameCards]
+      .map((card, index) =>
+        card.classList.contains("game__card--matched") ? index : null
+      )
+      .filter((index) => index !== null),
+
+    // GUARDAR LA POSICIÓN DE LA CAJA DESCUBIERTA
+    selectedCard:
+      selectedCard === null ? null : [...gameCards].indexOf(selectedCard),
+  };
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(gameData));
+};
+
+// RECUPERAR PARTIDA DE LOCAL STORAGE
+const loadGame = () => {
+  const savedGame = localStorage.getItem(STORAGE_KEY);
+
+  // COMPROBAR SI EXISTE UNA PARTIDA GUARDADA
+  if (savedGame === null) {
+    return;
+  }
+
+  const gameData = JSON.parse(savedGame);
+
+  // RECUPERAR LA DISTRIBUCIÓN DE LOS COLORES
+  gameData.colors.forEach((color, index) => {
+    cards[index] = color;
+    gameCards[index].dataset.color = color;
+  });
+
+  // RECUPERAR PAREJAS Y TIEMPO
+  matchedPairs = gameData.matchedPairs;
+  seconds = gameData.seconds;
+
+  pairs.textContent = matchedPairs;
+  updateTimer();
+
+  // RECUPERAR LAS CAJAS EMPAREJADAS
+  gameData.matchedCards.forEach((index) => {
+    const card = gameCards[index];
+
+    card.classList.add("game__card--matched");
+    card.style.backgroundColor = card.dataset.color;
+    card.draggable = false;
+  });
+
+  // RECUPERAR LA CAJA DESCUBIERTA
+  if (gameData.selectedCard !== null && gameData.selectedCard !== undefined) {
+    selectedCard = gameCards[gameData.selectedCard];
+
+    // MOSTRAR SU COLOR
+    selectedCard.style.backgroundColor = selectedCard.dataset.color;
+
+    // PERMITIR ARRASTRARLA
+    selectedCard.draggable = true;
+  }
+
+  // COMPROBAR SI LA PARTIDA ESTABA TERMINADA
+  if (matchedPairs === colors.length) {
+    message.textContent = `¡Enhorabuena! Has encontrado todas las parejas en ${timer.textContent}.`;
+  }
+};
+
 // TEMPORIZADOR
 const startTimer = () => {
-  if (timerInterval !== null) {
+  if (timerInterval !== null || matchedPairs === colors.length) {
     return;
   }
 
   timerInterval = setInterval(() => {
     seconds++;
 
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+    updateTimer();
 
-    timer.textContent =
-      String(minutes).padStart(2, "0") +
-      ":" +
-      String(remainingSeconds).padStart(2, "0");
+    // GUARDAR EL TIEMPO CADA SEGUNDO
+    saveGame();
   }, 1000);
 };
 
@@ -77,32 +157,38 @@ const startTimer = () => {
 const revealCard = (event) => {
   const card = event.currentTarget;
 
-  // Impedir seleccionar una caja emparejada
+  // IMPEDIR JUGAR SI LA PARTIDA ESTÁ TERMINADA
+  if (matchedPairs === colors.length) {
+    return;
+  }
+
+  // IMPEDIR SELECCIONAR UNA CAJA EMPAREJADA
   if (card.classList.contains("game__card--matched")) {
     return;
   }
 
-  // Impedir descubrir más de una caja
+  // IMPEDIR DESCUBRIR MÁS DE UNA CAJA
   if (selectedCard !== null) {
     return;
   }
 
-  // Guardar la caja seleccionada
+  // GUARDAR LA CAJA SELECCIONADA
   selectedCard = card;
 
   // INICIAR EL TEMPORIZADOR
   startTimer();
 
-  // Mostrar su color
+  // MOSTRAR SU COLOR
   card.style.backgroundColor = card.dataset.color;
 
-  // Permitir arrastrarla
+  // PERMITIR ARRASTRARLA
   card.draggable = true;
+
+  // GUARDAR EL INICIO DE LA PARTIDA
+  saveGame();
 };
 
 // ESCUCHAR LOS CLICS EN LAS CAJAS
-const gameCards = document.querySelectorAll(".game__card");
-
 gameCards.forEach((card) => {
   card.addEventListener("click", revealCard);
 });
@@ -118,25 +204,25 @@ const dropCard = (event) => {
 
   const targetCard = event.currentTarget;
 
-  // Comprobar que hay una caja seleccionada
+  // COMPROBAR QUE HAY UNA CAJA SELECCIONADA
   if (selectedCard === null) {
     return;
   }
 
-  // Impedir comparar una caja consigo misma
+  // IMPEDIR COMPARAR UNA CAJA CONSIGO MISMA
   if (selectedCard === targetCard) {
     return;
   }
 
-  // Impedir interactuar con parejas encontradas
+  // IMPEDIR INTERACTUAR CON PAREJAS ENCONTRADAS
   if (targetCard.classList.contains("game__card--matched")) {
     return;
   }
 
-  // Descubrir el color de la segunda caja
+  // DESCUBRIR EL COLOR DE LA SEGUNDA CAJA
   targetCard.style.backgroundColor = targetCard.dataset.color;
 
-  // Comparar los colores
+  // COMPARAR LOS COLORES
   if (selectedCard.dataset.color === targetCard.dataset.color) {
     selectedCard.classList.add("game__card--matched");
     targetCard.classList.add("game__card--matched");
@@ -147,7 +233,10 @@ const dropCard = (event) => {
     // ACTUALIZAR EL CONTADOR DE PAREJAS
     matchedPairs++;
     pairs.textContent = matchedPairs;
-    // DETENER EL TEMPORIZADOR AL COMPLETAR EL JUEGO
+
+    // GUARDAR EL PROGRESO DE LA PARTIDA
+    saveGame();
+
     // DETECTAR LA VICTORIA
     if (matchedPairs === colors.length) {
       clearInterval(timerInterval);
@@ -163,6 +252,7 @@ const dropCard = (event) => {
       targetCard.style.backgroundColor = "";
 
       selectedCard = null;
+      mismatchTimeout = null;
     }, 800);
   }
 };
@@ -179,26 +269,29 @@ gameCards.forEach((card) => {
 
 // REINICIAR LA PARTIDA
 const restartGame = () => {
-  // Detener el temporizador y las esperas pendientes
+  // DETENER EL TEMPORIZADOR Y LAS ESPERAS PENDIENTES
   clearInterval(timerInterval);
   clearTimeout(mismatchTimeout);
 
-  // Restablecer las variables
+  // BORRAR LA PARTIDA GUARDADA
+  localStorage.removeItem(STORAGE_KEY);
+
+  // RESTABLECER LAS VARIABLES
   timerInterval = null;
   mismatchTimeout = null;
   selectedCard = null;
   matchedPairs = 0;
   seconds = 0;
 
-  // Restablecer la información del HTML
+  // RESTABLECER LA INFORMACIÓN DEL HTML
   pairs.textContent = 0;
-  timer.textContent = "00:00";
+  updateTimer();
   message.textContent = "";
 
-  // Mezclar nuevamente los colores
+  // MEZCLAR NUEVAMENTE LOS COLORES
   cards.sort(() => Math.random() - 0.5);
 
-  // Restablecer las cajas
+  // RESTABLECER LAS CAJAS
   gameCards.forEach((card, index) => {
     card.dataset.color = cards[index];
     card.style.backgroundColor = "";
@@ -209,3 +302,6 @@ const restartGame = () => {
 
 // EVENTO DEL BOTÓN DE REINICIO
 restart.addEventListener("click", restartGame);
+
+// RECUPERAR LA PARTIDA AL CARGAR LA PÁGINA
+loadGame();
