@@ -45,4 +45,8 @@ N
 Este es mi primer proyecto con JavaScript, orientado a
 practicar la manipulación del DOM, los eventos, los arrays,
 las funciones, los condicionales y los temporizadores.
-  
+
+## Enlaces del proyecto
+
+- **Repositorio GitHub:** https://github.com/Neusgil/couple-game
+- **Jugar online:** https://neusgil.github.io/couple-game/
